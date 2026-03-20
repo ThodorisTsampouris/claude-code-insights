@@ -25,8 +25,18 @@ A real-time analytics dashboard for [Claude Code](https://docs.anthropic.com/en/
 
 ### Spending Overview
 - **Daily spending chart** — aggregate costs over time (7 / 14 / 30 day windows)
-- **Project breakdown** — see which projects are costing the most
+- **Project breakdown** — per-project cost bars with percentage share of total spend
 - **Session and token totals** — daily summaries of sessions, tokens, and spend
+
+### Configuration
+Manage your Claude Code setup from within the dashboard — no manual file editing required.
+
+- **CLAUDE.md editor** — create and edit project root, `.claude/`, and global instruction files with syntax highlighting, line numbers, and Cmd+S to save
+- **Commands** — browse, create, and delete custom slash commands (project and global)
+- **Agents** — manage sub-agent definitions with tool access controls and a select-all toggle
+- **Skills** — view and manage skill definitions available to Claude
+- **Hooks** — build event-driven hooks (PreToolUse, PostToolUse, Stop, etc.) with command or prompt types, optional matchers, and project/global scope
+- **Project selector** — switch between projects to edit their specific configuration
 
 ### Budget Management
 - **Spending limits** — set daily, weekly, and monthly budgets
@@ -107,7 +117,12 @@ src/
 │       ├── sessions/route.ts # Session list & detail API
 │       ├── spending/route.ts # Aggregate spending API
 │       ├── active/route.ts   # Active sessions API
-│       └── budget/route.ts   # Budget config read/write API
+│       ├── budget/route.ts   # Budget config read/write API
+│       ├── agents/route.ts   # Agent definitions CRUD
+│       ├── skills/route.ts   # Skill definitions CRUD
+│       ├── commands/route.ts # Slash commands CRUD
+│       ├── hooks/route.ts    # Hooks CRUD (global & project)
+│       └── claude-md/route.ts# CLAUDE.md read/write API
 ├── lib/
 │   ├── parser.ts             # JSONL log parsing & analysis
 │   ├── pricing.ts            # Model pricing & cost calculation
@@ -122,6 +137,7 @@ src/
     ├── ToolUsage.tsx
     ├── SessionPicker.tsx
     ├── SpendingSummary.tsx
+    ├── ProjectSpending.tsx
     ├── ConversationTimeline.tsx
     ├── FileHeatmap.tsx
     ├── AgentPanel.tsx
@@ -130,7 +146,13 @@ src/
     ├── BudgetSettings.tsx
     ├── BudgetBadge.tsx
     ├── ContextBar.tsx
-    └── Modal.tsx
+    ├── Modal.tsx
+    ├── ConfigPanel.tsx
+    ├── ClaudeMdEditor.tsx
+    ├── CommandManager.tsx
+    ├── AgentManager.tsx
+    ├── SkillManager.tsx
+    └── HookManager.tsx
 ```
 
 ## Privacy

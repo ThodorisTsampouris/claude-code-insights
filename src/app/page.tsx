@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import type { ProjectInfo, SessionData } from "@/lib/types";
 import { useTheme } from "@/lib/useTheme";
 import { useBudget } from "@/lib/useBudget";
@@ -19,8 +19,9 @@ import { MissionControl } from "@/components/MissionControl";
 import { BudgetSettings } from "@/components/BudgetSettings";
 import { BudgetBadge } from "@/components/BudgetBadge";
 import { ContextBar } from "@/components/ContextBar";
+import { ConfigPanel } from "@/components/ConfigPanel";
 
-type Tab = "session" | "spending" | "live" | "budget";
+type Tab = "session" | "spending" | "live" | "budget" | "config";
 
 export default function Dashboard() {
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
@@ -34,13 +35,18 @@ export default function Dashboard() {
   const { theme, toggle: toggleTheme } = useTheme();
   const { config: budgetConfig, setConfig: setBudgetConfig, status: budgetStatus, loading: budgetLoading } = useBudget();
 
-  // Fetch project list
-  useEffect(() => {
+  // Keep track of selected project/session across refreshes
+  const selectedRef = useRef({ project: selectedProject, session: selectedSession });
+  selectedRef.current = { project: selectedProject, session: selectedSession };
+
+  // Fetch project list - reusable
+  const fetchProjects = useCallback(() => {
     fetch("/api/sessions")
       .then((r) => r.json())
-      .then((data) => {
+      .then((data: ProjectInfo[]) => {
         setProjects(data);
-        if (data.length > 0 && data[0].sessions.length > 0 && !selectedProject) {
+        // Auto-select first session only on initial load (no selection yet)
+        if (data.length > 0 && data[0].sessions.length > 0 && !selectedRef.current.project) {
           setSelectedProject(data[0].path);
           setSelectedSession(data[0].sessions[0].id);
         }
@@ -48,6 +54,18 @@ export default function Dashboard() {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  // Initial project list fetch
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
+
+  // Auto-refresh project list every 5 seconds to detect new sessions
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(fetchProjects, 5000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, fetchProjects]);
 
   const fetchSession = useCallback(() => {
     if (!selectedProject || !selectedSession) return;
@@ -119,10 +137,10 @@ export default function Dashboard() {
         </div>
 
         {/* Tab switcher */}
-        <div className="mb-4 flex rounded-lg bg-[var(--bg-primary)] p-0.5">
+        <div className="mb-4 flex flex-wrap rounded-lg bg-[var(--bg-primary)] p-0.5">
           <button
             onClick={() => setActiveTab("live")}
-            className={`flex-1 rounded-md px-2 py-1.5 text-[10px] font-medium transition-colors ${
+            className={`flex-1 rounded-md px-1.5 py-1.5 text-[10px] font-medium transition-colors ${
               activeTab === "live"
                 ? "bg-[var(--bg-card)] text-[var(--accent-green)]"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -132,7 +150,7 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => setActiveTab("session")}
-            className={`flex-1 rounded-md px-2 py-1.5 text-[10px] font-medium transition-colors ${
+            className={`flex-1 rounded-md px-1.5 py-1.5 text-[10px] font-medium transition-colors ${
               activeTab === "session"
                 ? "bg-[var(--bg-card)] text-[var(--text-primary)]"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -142,23 +160,33 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => setActiveTab("spending")}
-            className={`flex-1 rounded-md px-2 py-1.5 text-[10px] font-medium transition-colors ${
+            className={`flex-1 rounded-md px-1.5 py-1.5 text-[10px] font-medium transition-colors ${
               activeTab === "spending"
                 ? "bg-[var(--bg-card)] text-[var(--text-primary)]"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             }`}
           >
-            Spending
+            Spend
           </button>
           <button
             onClick={() => setActiveTab("budget")}
-            className={`flex-1 rounded-md px-2 py-1.5 text-[10px] font-medium transition-colors ${
+            className={`flex-1 rounded-md px-1.5 py-1.5 text-[10px] font-medium transition-colors ${
               activeTab === "budget"
                 ? "bg-[var(--bg-card)] text-[var(--accent-orange)]"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             }`}
           >
             Budget
+          </button>
+          <button
+            onClick={() => setActiveTab("config")}
+            className={`flex-1 rounded-md px-1.5 py-1.5 text-[10px] font-medium transition-colors ${
+              activeTab === "config"
+                ? "bg-[var(--bg-card)] text-[var(--accent-purple)]"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            Config
           </button>
         </div>
 
@@ -209,17 +237,7 @@ export default function Dashboard() {
             }}
           />
         ) : activeTab === "spending" ? (
-          <div>
-            <div className="mb-6">
-              <h2 className="text-lg font-bold">Spending Overview</h2>
-              <p className="text-xs text-[var(--text-secondary)]">
-                Aggregate cost across all projects and sessions
-              </p>
-            </div>
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6">
-              <SpendingSummary />
-            </div>
-          </div>
+          <SpendingSummary />
         ) : activeTab === "budget" ? (
           <BudgetSettings
             config={budgetConfig}
@@ -227,6 +245,8 @@ export default function Dashboard() {
             loading={budgetLoading}
             onConfigChange={setBudgetConfig}
           />
+        ) : activeTab === "config" ? (
+          <ConfigPanel />
         ) : !session ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">

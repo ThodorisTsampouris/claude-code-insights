@@ -127,3 +127,73 @@ export interface ActiveSession {
   agentCount: number;
   activeAgentCount: number;
 }
+
+// ─── Agent & Skill Configuration ────────────────────────────────────────────
+
+export interface AgentDefinition {
+  id: string;
+  name: string;
+  description: string;
+  tools: string[];
+  model?: string;
+  color?: string;
+  prompt: string;
+  source: string;
+  filePath: string;
+  editable: boolean;
+}
+
+export interface SkillDefinition {
+  id: string;
+  name: string;
+  description: string;
+  version?: string;
+  content: string;
+  source: string;
+  filePath: string;
+  editable: boolean;
+}
+
+export interface ProjectSpending {
+  name: string;
+  cost: number;
+  sessions: number;
+}
+
+export interface CommandDefinition {
+  id: string;
+  name: string;
+  description: string;
+  argumentHint?: string;
+  allowedTools?: string[];
+  model?: string;
+  disableModelInvocation?: boolean;
+  content: string;
+  source: string;
+  filePath: string;
+  editable: boolean;
+}
+
+export interface HookEntry {
+  type: "command" | "prompt";
+  command?: string;
+  prompt?: string;
+  timeout?: number;
+}
+
+export interface HookDefinition {
+  id: string;
+  event: string;
+  hooks: HookEntry[];
+  matcher?: string;
+  source: string;
+  editable: boolean;
+}
+
+export interface ClaudeMdFile {
+  path: string;
+  location: "project-root" | "project-claude" | "global";
+  label: string;
+  content: string;
+  exists: boolean;
+}
