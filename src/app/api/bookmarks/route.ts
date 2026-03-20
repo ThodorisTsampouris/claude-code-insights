@@ -31,7 +31,12 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { sessionId, starred } = body;
 
-    if (!sessionId || typeof sessionId !== "string" || sessionId.length > 64) {
+    if (
+      !sessionId ||
+      typeof sessionId !== "string" ||
+      sessionId.length > 64 ||
+      !/^[0-9a-f-]+$/i.test(sessionId)
+    ) {
       return NextResponse.json({ error: "Invalid sessionId" }, { status: 400 });
     }
 

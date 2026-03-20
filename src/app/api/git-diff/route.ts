@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { promisify } from "util";
-import { exec as execCb } from "child_process";
+import { execFile as execFileCb } from "child_process";
 import { existsSync } from "fs";
 import { join, resolve } from "path";
-import { homedir } from "os";
 import { getSessionData, getClaudeDir } from "@/lib/parser";
 
 export const dynamic = "force-dynamic";
 
-const exec = promisify(execCb);
+// Use execFile — args are passed directly to git without a shell, preventing
+// any command injection from special characters in projectRoot or timestamps.
+const execFile = promisify(execFileCb);
 
 interface GitCommit {
   hash: string;
@@ -25,6 +26,17 @@ interface GitDiffResponse {
   filesChanged: number;
   insertions: number;
   deletions: number;
+}
+
+// Validate that a string is a well-formed git SHA-1 hash before using it
+// in a git command. Prevents any crafted input from acting as a flag or ref.
+function isValidGitHash(hash: string): boolean {
+  return /^[0-9a-f]{40}$/i.test(hash);
+}
+
+// Validate the sessionId is a safe UUID-like string before passing to getSessionData.
+function isValidSessionId(id: string): boolean {
+  return /^[0-9a-f-]{1,64}$/i.test(id);
 }
 
 function isPathSafe(projectPath: string): boolean {
@@ -74,6 +86,12 @@ function parseStat(stat: string): { filesChanged: number; insertions: number; de
   };
 }
 
+// Run git with argument arrays via execFile — no shell, no injection risk.
+async function git(cwd: string, args: string[]): Promise<string> {
+  const { stdout } = await execFile("git", args, { timeout: 5000, cwd });
+  return stdout.trim();
+}
+
 const EMPTY: GitDiffResponse = {
   supported: true,
   commits: [],
@@ -96,6 +114,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid path" }, { status: 400 });
   }
 
+  if (!isValidSessionId(sessionId)) {
+    return NextResponse.json({ error: "Invalid session ID" }, { status: 400 });
+  }
+
   const projectRoot = decodeProjectRoot(projectPath);
   if (!projectRoot) {
     return NextResponse.json({ ...EMPTY, supported: false, error: "Project directory not found" });
@@ -112,17 +134,19 @@ export async function GET(request: Request) {
     return NextResponse.json(EMPTY);
   }
 
-  const opts = { timeout: 5000, cwd: projectRoot };
-
   try {
-    // Get commits in the session timeframe
-    const logCmd = `git -C "${projectRoot}" log --pretty=format:"%H|%s|%aI" --since="${startTime}" --until="${lastActivity}"`;
+    // Get commits in the session timeframe.
+    // All arguments are in an array — execFile passes them directly to git,
+    // no shell expansion occurs regardless of what startTime/lastActivity contain.
     let logOutput = "";
     try {
-      const { stdout } = await exec(logCmd, opts);
-      logOutput = stdout.trim();
+      logOutput = await git(projectRoot, [
+        "log",
+        "--pretty=format:%H|%s|%aI",
+        `--since=${startTime}`,
+        `--until=${lastActivity}`,
+      ]);
     } catch {
-      // Check if it's a "not a git repo" error
       return NextResponse.json({ ...EMPTY, supported: false, error: "Not a git repository" });
     }
 
@@ -147,9 +171,13 @@ export async function GET(request: Request) {
       return NextResponse.json(EMPTY);
     }
 
-    // Get diff stat between first and last commit
     const firstHash = commits[commits.length - 1].hash;
     const lastHash = commits[0].hash;
+
+    // Validate hashes before using them as git arguments.
+    if (!isValidGitHash(firstHash) || !isValidGitHash(lastHash)) {
+      return NextResponse.json({ ...EMPTY, commits });
+    }
 
     let stat = "";
     let filesChanged = 0;
@@ -157,24 +185,17 @@ export async function GET(request: Request) {
     let deletions = 0;
 
     try {
-      // Try diff from parent of first commit to last commit
-      const { stdout } = await exec(
-        `git -C "${projectRoot}" diff ${firstHash}^..${lastHash} --stat`,
-        opts,
-      );
-      stat = stdout.trim();
+      // Diff from parent of first commit to last commit.
+      // `${firstHash}^` is safe because firstHash has been validated as 40 hex chars.
+      stat = await git(projectRoot, ["diff", `${firstHash}^`, lastHash, "--stat"]);
       const parsed = parseStat(stat);
       filesChanged = parsed.filesChanged;
       insertions = parsed.insertions;
       deletions = parsed.deletions;
     } catch {
-      // Fallback: initial commit (no parent)
+      // Fallback: initial commit with no parent
       try {
-        const { stdout } = await exec(
-          `git -C "${projectRoot}" diff ${firstHash} --stat`,
-          opts,
-        );
-        stat = stdout.trim();
+        stat = await git(projectRoot, ["diff", firstHash, "--stat"]);
         const parsed = parseStat(stat);
         filesChanged = parsed.filesChanged;
         insertions = parsed.insertions;
@@ -194,7 +215,6 @@ export async function GET(request: Request) {
     } satisfies GitDiffResponse);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    // ENOENT means git not installed
     if (msg.includes("ENOENT") || msg.includes("not found")) {
       return NextResponse.json({ ...EMPTY, supported: false, error: "git not available" });
     }
