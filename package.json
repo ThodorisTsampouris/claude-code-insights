@@ -1,6 +1,6 @@
 {
   "name": "@teots/claude-code-insights",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "description": "Real-time analytics dashboard for Claude Code sessions",
   "keywords": [
     "claude",
@@ -10,9 +10,7 @@
     "developer-tools"
   ],
   "license": "MIT",
-  "bin": {
-    "claude-code-insights": "./bin/cli.js"
-  },
+  "bin": "bin/cli.js",
   "files": [
     "bin/",
     "src/",

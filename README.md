@@ -2,7 +2,32 @@
 
 A real-time analytics dashboard for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) sessions. Track spending, monitor token usage, analyze tool activity, search conversations, and watch live sessions — all from a local web UI with no external services.
 
+[![npm version](https://img.shields.io/npm/v/@teots/claude-code-insights)](https://www.npmjs.com/package/@teots/claude-code-insights)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ![Claude Code Insights Dashboard](docs/images/dashboard.png)
+
+## Quick Start
+
+```bash
+npx @teots/claude-code-insights
+```
+
+That's it. The first run builds the dashboard (~30s), then opens it in your browser. Subsequent runs start instantly.
+
+### Options
+
+```bash
+npx @teots/claude-code-insights --port 8080   # custom port (default: 3141)
+npx @teots/claude-code-insights --rebuild      # force a fresh build
+npx @teots/claude-code-insights --help         # show all options
+```
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) 18+
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and used at least once (so `~/.claude/projects/` exists)
+- `git` in your `PATH` (optional — required for the Git Activity panel)
 
 ## Features
 
@@ -69,31 +94,9 @@ Claude Code stores session logs as `.jsonl` files in `~/.claude/projects/`. This
 
 The parser extracts messages, token usage, tool calls, and cost data from each session log. Costs are calculated locally using Anthropic's published pricing. Git data is read by running `git` commands in your project directory.
 
-## Getting Started
+## Development
 
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) 18+
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and used at least once (so `~/.claude/projects/` exists)
-- `git` in your `PATH` (optional — required for the Git Activity panel)
-
-### Quick Start (recommended)
-
-```bash
-npx @teots/claude-code-insights
-```
-
-That's it. The first run builds the dashboard (~30s), then opens it in your browser. Subsequent runs start instantly.
-
-Custom port:
-
-```bash
-npx @teots/claude-code-insights --port 8080
-```
-
-### From Source
-
-If you prefer to clone and run locally:
+If you prefer to clone and run from source:
 
 ```bash
 git clone https://github.com/ThodorisTsampouris/claude-code-insights.git
@@ -113,15 +116,9 @@ npm start
 
 ## Configuration
 
-Copy the example environment file if you want to customize settings:
-
-```bash
-cp .env.example .env
-```
-
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT`   | `3141`  | Port the dashboard runs on |
+| `PORT`   | `3141`  | Port the dashboard runs on (also via `--port` flag) |
 
 ## Persistent Data
 
@@ -133,6 +130,8 @@ The dashboard writes two small JSON files to `~/.claude/`:
 | `insights-bookmarks.json` | Starred session IDs |
 
 Both files are human-readable and can be deleted at any time to reset to defaults.
+
+When installed via `npx`, the dashboard caches its build in `~/.claude-code-insights/`. You can safely delete this directory — it will be rebuilt on the next run.
 
 ## Tech Stack
 
