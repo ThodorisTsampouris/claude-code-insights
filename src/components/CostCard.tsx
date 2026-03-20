@@ -1,6 +1,7 @@
 "use client";
 
-import type { TokenUsage } from "@/lib/types";
+import type { TokenUsage, FileActivity } from "@/lib/types";
+import { EfficiencyBadge } from "@/components/EfficiencyBadge";
 
 function formatCost(cost: number): string {
   if (cost < 0.01) return `$${cost.toFixed(4)}`;
@@ -14,9 +15,22 @@ function formatTokens(n: number): string {
   return n.toString();
 }
 
-export function CostCard({ totalCost, totalTokens }: { totalCost: number; totalTokens: TokenUsage }) {
+export function CostCard({
+  totalCost,
+  totalTokens,
+  fileActivity,
+  gitInsertions,
+  gitDeletions,
+}: {
+  totalCost: number;
+  totalTokens: TokenUsage;
+  fileActivity?: FileActivity[];
+  gitInsertions?: number;
+  gitDeletions?: number;
+}) {
   const totalInput = totalTokens.inputTokens + totalTokens.cacheCreationTokens + totalTokens.cacheReadTokens;
   const totalAll = totalInput + totalTokens.outputTokens;
+  const hasFileActivity = fileActivity && fileActivity.length > 0;
 
   return (
     <div className="glow-green rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6">
@@ -38,6 +52,17 @@ export function CostCard({ totalCost, totalTokens }: { totalCost: number; totalT
         <span className="text-xs text-[var(--text-secondary)]">Total tokens</span>
         <span className="text-sm font-medium">{formatTokens(totalAll)}</span>
       </div>
+
+      {hasFileActivity && (
+        <div className="mt-4 border-t border-[var(--border)] pt-3">
+          <EfficiencyBadge
+            totalCost={totalCost}
+            fileActivity={fileActivity!}
+            gitInsertions={gitInsertions}
+            gitDeletions={gitDeletions}
+          />
+        </div>
+      )}
     </div>
   );
 }

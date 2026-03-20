@@ -4,12 +4,15 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import type { ProjectInfo, SessionData } from "@/lib/types";
 import { useTheme } from "@/lib/useTheme";
 import { useBudget } from "@/lib/useBudget";
+import { useBookmarks } from "@/lib/useBookmarks";
+import { useGitDiff } from "@/lib/useGitDiff";
 import { CostCard } from "@/components/CostCard";
 import { CostChart } from "@/components/CostChart";
 import { ModelBreakdown } from "@/components/ModelBreakdown";
 import { ToolUsage } from "@/components/ToolUsage";
 import { AgentPanel } from "@/components/AgentPanel";
 import { SessionPicker } from "@/components/SessionPicker";
+import { SessionSearch } from "@/components/SessionSearch";
 import { ConversationTimeline } from "@/components/ConversationTimeline";
 import { FileHeatmap } from "@/components/FileHeatmap";
 import { CostPerTurnChart } from "@/components/CostPerTurn";
@@ -20,6 +23,9 @@ import { BudgetSettings } from "@/components/BudgetSettings";
 import { BudgetBadge } from "@/components/BudgetBadge";
 import { ContextBar } from "@/components/ContextBar";
 import { ConfigPanel } from "@/components/ConfigPanel";
+import { CopyResumeButton } from "@/components/CopyResumeButton";
+import { ExportButton } from "@/components/ExportButton";
+import { GitDiffPanel } from "@/components/GitDiffPanel";
 
 type Tab = "session" | "spending" | "live" | "budget" | "config";
 
@@ -31,9 +37,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("session");
+  const [showOnlyBookmarked, setShowOnlyBookmarked] = useState(false);
 
   const { theme, toggle: toggleTheme } = useTheme();
   const { config: budgetConfig, setConfig: setBudgetConfig, status: budgetStatus, loading: budgetLoading } = useBudget();
+  const { bookmarks, toggleBookmark } = useBookmarks();
+  const { data: gitData, loading: gitLoading } = useGitDiff(selectedProject, selectedSession);
 
   // Keep track of selected project/session across refreshes
   const selectedRef = useRef({ project: selectedProject, session: selectedSession });
@@ -216,12 +225,19 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Session search */}
+        <SessionSearch onSelectSession={handleSelect} />
+
         <div className="flex-1 overflow-hidden">
           <SessionPicker
             projects={projects}
             selectedProject={selectedProject}
             selectedSession={selectedSession}
             onSelect={handleSelect}
+            bookmarks={bookmarks}
+            onToggleBookmark={toggleBookmark}
+            showOnlyBookmarked={showOnlyBookmarked}
+            onToggleFilter={() => setShowOnlyBookmarked((v) => !v)}
           />
         </div>
       </div>
@@ -237,7 +253,7 @@ export default function Dashboard() {
             }}
           />
         ) : activeTab === "spending" ? (
-          <SpendingSummary />
+          <SpendingSummary monthlyBudget={budgetConfig.monthly} />
         ) : activeTab === "budget" ? (
           <BudgetSettings
             config={budgetConfig}
@@ -270,18 +286,28 @@ export default function Dashboard() {
                   {new Date(session.startTime).toLocaleDateString()}
                 </p>
               </div>
-              {autoRefresh && (
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 animate-pulse-slow rounded-full bg-[var(--accent-green)]" />
-                  <span className="text-[10px] text-[var(--text-secondary)]">Live</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <ExportButton session={session} size="md" />
+                <CopyResumeButton sessionId={session.sessionId} projectRoot={session.projectRoot} size="md" />
+                {autoRefresh && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 animate-pulse-slow rounded-full bg-[var(--accent-green)]" />
+                    <span className="text-[10px] text-[var(--text-secondary)]">Live</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Row 1: Cost + Cost Over Time */}
             <div className="mb-5 grid grid-cols-12 gap-5">
               <div className="col-span-4">
-                <CostCard totalCost={session.totalCost} totalTokens={session.totalTokens} />
+                <CostCard
+                  totalCost={session.totalCost}
+                  totalTokens={session.totalTokens}
+                  fileActivity={session.fileActivity}
+                  gitInsertions={gitData?.insertions}
+                  gitDeletions={gitData?.deletions}
+                />
               </div>
               <div className="col-span-8 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
                 <div className="mb-3 text-xs uppercase tracking-wider text-[var(--text-secondary)]">
@@ -312,7 +338,7 @@ export default function Dashboard() {
               <ConversationTimeline events={session.timeline} />
             </div>
 
-            {/* Row 3: Cost Per Turn */}
+            {/* Row 4: Cost Per Turn */}
             <div className="mb-5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
               <div className="mb-4 text-xs uppercase tracking-wider text-[var(--text-secondary)]">
                 Cost Per Turn
@@ -320,7 +346,7 @@ export default function Dashboard() {
               <CostPerTurnChart turns={session.costPerTurn} />
             </div>
 
-            {/* Row 4: Model + Tools */}
+            {/* Row 5: Model + Tools */}
             <div className="mb-5 grid grid-cols-12 gap-5">
               <div className="col-span-5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
                 <div className="mb-4 text-xs uppercase tracking-wider text-[var(--text-secondary)]">
@@ -336,7 +362,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Row 5: File Heatmap */}
+            {/* Row 6: File Heatmap */}
             <div className="mb-5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
               <div className="mb-4 flex items-center justify-between">
                 <div className="text-xs uppercase tracking-wider text-[var(--text-secondary)]">
@@ -351,7 +377,17 @@ export default function Dashboard() {
               <FileHeatmap files={session.fileActivity} />
             </div>
 
-            {/* Row 6: Agents */}
+            {/* Row 7: Git Activity */}
+            {session.projectRoot && (
+              <div className="mb-5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
+                <div className="mb-4 text-xs uppercase tracking-wider text-[var(--text-secondary)]">
+                  Git Activity
+                </div>
+                <GitDiffPanel data={gitData} loading={gitLoading} />
+              </div>
+            )}
+
+            {/* Row 8: Agents */}
             <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
               <div className="mb-4 flex items-center justify-between">
                 <div className="text-xs uppercase tracking-wider text-[var(--text-secondary)]">

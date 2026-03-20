@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import type { ActiveSession, MessageInfo } from "@/lib/types";
+import { CopyResumeButton } from "@/components/CopyResumeButton";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -196,9 +197,12 @@ function SessionCard({ session, color, onSelect }: {
             {session.model}
           </span>
         </div>
-        <span className="text-[10px] text-[var(--text-secondary)]">
-          {timeAgo(session.lastActivity)}
-        </span>
+        <div className="flex items-center gap-1">
+          <CopyResumeButton sessionId={session.sessionId} projectRoot={session.projectRoot} size="sm" />
+          <span className="text-[10px] text-[var(--text-secondary)]">
+            {timeAgo(session.lastActivity)}
+          </span>
+        </div>
       </div>
 
       {/* Stats row */}

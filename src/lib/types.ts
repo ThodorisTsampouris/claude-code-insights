@@ -80,6 +80,7 @@ export interface SessionData {
   sessionId: string;
   projectPath: string;
   projectName: string;
+  projectRoot: string | null;
   startTime: string;
   lastActivity: string;
   totalCost: number;
@@ -101,6 +102,7 @@ export interface SessionData {
 export interface ProjectInfo {
   path: string;
   name: string;
+  root: string | null;
   sessions: { id: string; file: string; modifiedAt: string; size: number }[];
 }
 
@@ -116,6 +118,7 @@ export interface ActiveSession {
   sessionId: string;
   projectPath: string;
   projectName: string;
+  projectRoot: string | null;
   lastActivity: string;
   startTime: string;
   totalCost: number;
@@ -188,6 +191,25 @@ export interface HookDefinition {
   matcher?: string;
   source: string;
   editable: boolean;
+}
+
+export interface SearchResult {
+  sessionId: string;
+  projectPath: string;
+  projectName: string;
+  excerpt: string;
+  timestamp: string;
+  matchCount: number;
+}
+
+export interface GitDiffResponse {
+  supported: boolean;
+  error?: string;
+  commits: { hash: string; shortHash: string; message: string; time: string }[];
+  stat: string;
+  filesChanged: number;
+  insertions: number;
+  deletions: number;
 }
 
 export interface ClaudeMdFile {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import type { DailySpending } from "@/lib/types";
 import { ProjectSpending } from "./ProjectSpending";
+import { CostForecast } from "./CostForecast";
 
 function formatCost(cost: number): string {
   if (cost < 0.01) return `$${cost.toFixed(4)}`;
@@ -62,7 +63,7 @@ function getVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-export function SpendingSummary() {
+export function SpendingSummary({ monthlyBudget }: { monthlyBudget?: number | null }) {
   const [data, setData] = useState<DailySpending[]>([]);
   const [period, setPeriod] = useState<7 | 14 | 30>(7);
   const [loading, setLoading] = useState(true);
@@ -168,6 +169,11 @@ export function SpendingSummary() {
           )}
         </div>
       </div>
+
+      {/* Monthly Forecast */}
+      {!loading && data.length > 0 && (
+        <CostForecast data={data} monthlyBudget={monthlyBudget} />
+      )}
 
       {/* Spending by Project */}
       <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6">

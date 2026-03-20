@@ -1,6 +1,6 @@
 # Claude Code Insights
 
-A real-time analytics dashboard for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) sessions. Track spending, monitor token usage, analyze tool activity, and watch live sessions — all from a local web UI.
+A real-time analytics dashboard for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) sessions. Track spending, monitor token usage, analyze tool activity, search conversations, and watch live sessions — all from a local web UI with no external services.
 
 ![Claude Code Insights Dashboard](docs/images/dashboard.png)
 
@@ -9,6 +9,7 @@ A real-time analytics dashboard for [Claude Code](https://docs.anthropic.com/en/
 ### Session Analytics
 - **Cost tracking** — cumulative cost chart per session with model-level breakdown
 - **Token usage** — input, output, cache read, and cache write token counts
+- **Token efficiency score** — cost per file edit and cost per line changed (with git), rated Very efficient / Efficient / Moderate / Expensive
 - **Model breakdown** — see which models (Opus, Sonnet, Haiku) were used and their cost share
 - **Tool usage** — bar chart of tool calls (Read, Edit, Write, Bash, Grep, Glob, Agent, etc.)
 - **Cost per turn** — see how much each user prompt cost to process
@@ -17,16 +18,36 @@ A real-time analytics dashboard for [Claude Code](https://docs.anthropic.com/en/
 - **Agent panel** — track sub-agents spawned during a session with their individual costs and full prompts
 - **Context window** — real-time progress bar showing how full the context is, with compaction markers
 - **Compaction insights** — see when compactions happened, how many tokens were freed, and context usage over time
+- **Git activity** — commits made during the session, files changed, lines inserted/deleted, and a collapsible diff stat (requires git)
+
+### Session Actions
+- **Resume session** — copy `cd <project> && claude --resume <id>` to clipboard with one click, from the session header, sidebar, or Mission Control
+- **Export as Markdown** — download the full conversation as a `.md` file including user prompts, tool calls, cost per turn, and file activity table
+- **Bookmark sessions** — star any session to pin it to the top of the list; filter to show only starred sessions; bookmarks persist to `~/.claude/insights-bookmarks.json`
+
+### Session Search
+- **Full-text search** — search across all session conversations with a debounced search bar in the sidebar
+- Results show project name, session ID, time, excerpt with match context, and match count
+- Click any result to navigate directly to that session
 
 ### Mission Control
 - **Live monitoring** — real-time view of all active Claude Code sessions across projects
 - **Unified activity feed** — see user messages, tool calls, and agent spawns as they happen
 - **Multi-session overview** — cost and status at a glance for every running session
+- **Resume from live view** — copy the resume command directly from any active session card
 
 ### Spending Overview
 - **Daily spending chart** — aggregate costs over time (7 / 14 / 30 day windows)
+- **Monthly forecast** — projected end-of-month spend based on daily average, with days remaining and budget comparison
 - **Project breakdown** — per-project cost bars with percentage share of total spend
 - **Session and token totals** — daily summaries of sessions, tokens, and spend
+
+### Budget Management
+- **Spending limits** — set daily, weekly, and monthly budgets
+- **Visual progress meters** — see how close you are to each limit at a glance
+- **Browser notifications** — get alerted when spending hits a configurable threshold (default 90%) or exceeds the budget
+- **Warning threshold slider** — customize when you want to be notified (50%–99%)
+- **Persistent config** — budget settings are saved to `~/.claude/insights-config.json` so they survive browser clears and restarts
 
 ### Configuration
 Manage your Claude Code setup from within the dashboard — no manual file editing required.
@@ -38,13 +59,6 @@ Manage your Claude Code setup from within the dashboard — no manual file editi
 - **Hooks** — build event-driven hooks (PreToolUse, PostToolUse, Stop, etc.) with command or prompt types, optional matchers, and project/global scope
 - **Project selector** — switch between projects to edit their specific configuration
 
-### Budget Management
-- **Spending limits** — set daily, weekly, and monthly budgets
-- **Visual progress meters** — see how close you are to each limit at a glance
-- **Browser notifications** — get alerted when spending hits a configurable threshold (default 90%) or exceeds the budget
-- **Warning threshold slider** — customize when you want to be notified (50%–99%)
-- **Persistent config** — budget settings are saved to `~/.claude/insights-config.json` so they survive browser clears and restarts
-
 ### Appearance
 - **Dark / Light mode** — toggle between themes with the sun/moon button in the sidebar
 - Theme preference is persisted in localStorage
@@ -53,7 +67,7 @@ Manage your Claude Code setup from within the dashboard — no manual file editi
 
 Claude Code stores session logs as `.jsonl` files in `~/.claude/projects/`. This dashboard reads those logs directly from disk — no API keys, no external services, no data leaves your machine.
 
-The parser extracts messages, token usage, tool calls, and cost data from each session log. Costs are calculated locally using Anthropic's published pricing.
+The parser extracts messages, token usage, tool calls, and cost data from each session log. Costs are calculated locally using Anthropic's published pricing. Git data is read by running `git` commands in your project directory.
 
 ## Getting Started
 
@@ -61,6 +75,7 @@ The parser extracts messages, token usage, tool calls, and cost data from each s
 
 - [Node.js](https://nodejs.org/) 18+
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and used at least once (so `~/.claude/projects/` exists)
+- `git` in your `PATH` (optional — required for the Git Activity panel)
 
 ### Install
 
@@ -97,6 +112,17 @@ cp .env.example .env
 |----------|---------|-------------|
 | `PORT`   | `3141`  | Port the dashboard runs on |
 
+## Persistent Data
+
+The dashboard writes two small JSON files to `~/.claude/`:
+
+| File | Purpose |
+|------|---------|
+| `insights-config.json` | Budget limits, notification threshold, enable/disable flag |
+| `insights-bookmarks.json` | Starred session IDs |
+
+Both files are human-readable and can be deleted at any time to reset to defaults.
+
 ## Tech Stack
 
 - [Next.js](https://nextjs.org/) 15 with Turbopack
@@ -111,53 +137,65 @@ cp .env.example .env
 ```
 src/
 ├── app/
-│   ├── page.tsx              # Main dashboard
-│   ├── layout.tsx            # Root layout
+│   ├── page.tsx                # Main dashboard
+│   ├── layout.tsx              # Root layout
 │   └── api/
-│       ├── sessions/route.ts # Session list & detail API
-│       ├── spending/route.ts # Aggregate spending API
-│       ├── active/route.ts   # Active sessions API
-│       ├── budget/route.ts   # Budget config read/write API
-│       ├── agents/route.ts   # Agent definitions CRUD
-│       ├── skills/route.ts   # Skill definitions CRUD
-│       ├── commands/route.ts # Slash commands CRUD
-│       ├── hooks/route.ts    # Hooks CRUD (global & project)
-│       └── claude-md/route.ts# CLAUDE.md read/write API
+│       ├── sessions/route.ts   # Session list & detail
+│       ├── spending/route.ts   # Aggregate spending
+│       ├── active/route.ts     # Active sessions
+│       ├── search/route.ts     # Full-text session search
+│       ├── git-diff/route.ts   # Git activity for a session
+│       ├── bookmarks/route.ts  # Bookmark read/write
+│       ├── budget/route.ts     # Budget config read/write
+│       ├── agents/route.ts     # Agent definitions CRUD
+│       ├── skills/route.ts     # Skill definitions CRUD
+│       ├── commands/route.ts   # Slash commands CRUD
+│       ├── hooks/route.ts      # Hooks CRUD (global & project)
+│       └── claude-md/route.ts  # CLAUDE.md read/write
 ├── lib/
-│   ├── parser.ts             # JSONL log parsing & analysis
-│   ├── pricing.ts            # Model pricing & cost calculation
-│   ├── types.ts              # Shared TypeScript types
-│   ├── useTheme.ts           # Dark/light theme hook
-│   └── useBudget.ts          # Budget management hook
-└── components/               # React UI components
-    ├── CostCard.tsx
-    ├── CostChart.tsx
-    ├── CostPerTurn.tsx
-    ├── ModelBreakdown.tsx
-    ├── ToolUsage.tsx
-    ├── SessionPicker.tsx
-    ├── SpendingSummary.tsx
-    ├── ProjectSpending.tsx
-    ├── ConversationTimeline.tsx
-    ├── FileHeatmap.tsx
-    ├── AgentPanel.tsx
-    ├── LiveFeed.tsx
-    ├── MissionControl.tsx
-    ├── BudgetSettings.tsx
-    ├── BudgetBadge.tsx
-    ├── ContextBar.tsx
-    ├── Modal.tsx
-    ├── ConfigPanel.tsx
-    ├── ClaudeMdEditor.tsx
-    ├── CommandManager.tsx
-    ├── AgentManager.tsx
-    ├── SkillManager.tsx
-    └── HookManager.tsx
+│   ├── parser.ts               # JSONL log parsing & analysis
+│   ├── pricing.ts              # Model pricing & cost calculation
+│   ├── types.ts                # Shared TypeScript types
+│   ├── useTheme.ts             # Dark/light theme hook
+│   ├── useBudget.ts            # Budget management hook
+│   ├── useBookmarks.ts         # Bookmark state & persistence hook
+│   └── useGitDiff.ts           # Git diff fetch hook
+└── components/
+    ├── CostCard.tsx            # Session cost + token stats + efficiency
+    ├── CostChart.tsx           # Cost over time line chart
+    ├── CostPerTurn.tsx         # Per-turn cost bar chart
+    ├── CostForecast.tsx        # Monthly spend projection
+    ├── EfficiencyBadge.tsx     # Cost-per-edit / cost-per-line metric
+    ├── ModelBreakdown.tsx      # Model distribution chart
+    ├── ToolUsage.tsx           # Tool call frequency chart
+    ├── SessionPicker.tsx       # Sidebar session list with bookmarks
+    ├── SessionSearch.tsx       # Full-text search bar + results
+    ├── SpendingSummary.tsx     # Aggregate daily/project spending
+    ├── ProjectSpending.tsx     # Project cost breakdown bars
+    ├── ConversationTimeline.tsx# Message/tool/agent timeline
+    ├── FileHeatmap.tsx         # File activity table
+    ├── GitDiffPanel.tsx        # Git commits + diff stat for session
+    ├── AgentPanel.tsx          # Sub-agent detail cards
+    ├── LiveFeed.tsx            # Floating real-time activity overlay
+    ├── MissionControl.tsx      # Multi-session live monitoring
+    ├── BudgetSettings.tsx      # Budget input + meters + alerts
+    ├── BudgetBadge.tsx         # Sidebar budget alert badge
+    ├── BookmarkButton.tsx      # Star icon for session bookmarking
+    ├── CopyResumeButton.tsx    # Copy resume command to clipboard
+    ├── ExportButton.tsx        # Export session as Markdown
+    ├── ContextBar.tsx          # Context window progress bar
+    ├── Modal.tsx               # Reusable modal dialog
+    ├── ConfigPanel.tsx         # Config tab switcher
+    ├── ClaudeMdEditor.tsx      # CLAUDE.md code editor
+    ├── CommandManager.tsx      # Slash command CRUD UI
+    ├── AgentManager.tsx        # Agent definition CRUD UI
+    ├── SkillManager.tsx        # Skill definition viewer
+    └── HookManager.tsx         # Hook definition editor
 ```
 
 ## Privacy
 
-All data stays on your machine. The dashboard reads Claude Code's local session logs and performs all calculations client-side and server-side within your local Next.js instance. Nothing is sent to any external service.
+All data stays on your machine. The dashboard reads Claude Code's local session logs and performs all calculations within your local Next.js instance. The only external process invoked is `git` in your own project directories. Nothing is sent to any external service.
 
 ## License
 

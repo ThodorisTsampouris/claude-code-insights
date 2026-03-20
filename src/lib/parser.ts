@@ -85,6 +85,7 @@ export interface SessionSummary {
   sessionId: string;
   projectPath: string;
   projectName: string;
+  projectRoot: string | null;
   startTime: string;
   lastActivity: string;
   totalCost: number;
@@ -106,6 +107,7 @@ export interface SessionSummary {
 export interface ProjectInfo {
   path: string;
   name: string;
+  root: string | null;
   sessions: { id: string; file: string; modifiedAt: Date; size: number }[];
 }
 
@@ -500,6 +502,7 @@ function analyzeSession(
     sessionId,
     projectPath,
     projectName: decodeProjectPath(projectPath),
+    projectRoot: decodeProjectRoot(projectPath),
     startTime: timestamps[0] || "",
     lastActivity: timestamps[timestamps.length - 1] || "",
     totalCost,
@@ -525,6 +528,36 @@ function decodeProjectPath(encoded: string): string {
   // Return just the last path segment
   const parts = decoded.split("/").filter(Boolean);
   return parts[parts.length - 1] || encoded;
+}
+
+/** Decode encoded project path to real filesystem path (handles dashes in folder names). */
+function decodeProjectRoot(encoded: string): string | null {
+  const naive = encoded.replace(/^-/, "/").replace(/-/g, "/");
+  if (existsSync(naive)) return naive;
+
+  // Walk segments and find the longest valid prefix (dashes in names)
+  const parts = encoded.replace(/^-/, "").split("-");
+  let current = "/";
+  let i = 0;
+
+  while (i < parts.length) {
+    let found = false;
+    for (let j = parts.length; j > i; j--) {
+      const candidate = join(current, parts.slice(i, j).join("-"));
+      if (existsSync(candidate)) {
+        current = candidate;
+        i = j;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      current = join(current, parts[i]);
+      i++;
+    }
+  }
+
+  return existsSync(current) ? current : null;
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -576,6 +609,7 @@ export function listProjects(): ProjectInfo[] {
         projects.push({
           path: dir,
           name: decodeProjectPath(dir),
+          root: decodeProjectRoot(dir),
           sessions,
         });
       }
@@ -692,6 +726,7 @@ export interface ActiveSession {
   sessionId: string;
   projectPath: string;
   projectName: string;
+  projectRoot: string | null;
   lastActivity: string;
   startTime: string;
   totalCost: number;
@@ -736,6 +771,7 @@ export function getActiveSessions(thresholdMinutes: number = 10): ActiveSession[
         sessionId: data.sessionId,
         projectPath: project.path,
         projectName: data.projectName,
+        projectRoot: project.root,
         lastActivity: data.lastActivity,
         startTime: data.startTime,
         totalCost: data.totalCost,
