@@ -1,6 +1,6 @@
 {
   "name": "@teots/claude-code-insights",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Real-time analytics dashboard for Claude Code sessions",
   "keywords": [
     "claude",

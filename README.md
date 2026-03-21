@@ -82,6 +82,7 @@ Manage your Claude Code setup from within the dashboard — no manual file editi
 - **Agents** — manage sub-agent definitions with tool access controls and a select-all toggle
 - **Skills** — view and manage skill definitions available to Claude
 - **Hooks** — build event-driven hooks (PreToolUse, PostToolUse, Stop, etc.) with command or prompt types, optional matchers, and project/global scope
+- **Permissions** — view and manage allow / ask / deny tool permission rules across global and project scopes, with one-click delete and quick-add from common rule templates
 - **Project selector** — switch between projects to edit their specific configuration
 
 ### Appearance
@@ -161,6 +162,7 @@ src/
 │       ├── skills/route.ts     # Skill definitions CRUD
 │       ├── commands/route.ts   # Slash commands CRUD
 │       ├── hooks/route.ts      # Hooks CRUD (global & project)
+│       ├── permissions/route.ts # Permission rules CRUD (global & project)
 │       └── claude-md/route.ts  # CLAUDE.md read/write
 ├── lib/
 │   ├── parser.ts               # JSONL log parsing & analysis
@@ -200,7 +202,8 @@ src/
     ├── CommandManager.tsx      # Slash command CRUD UI
     ├── AgentManager.tsx        # Agent definition CRUD UI
     ├── SkillManager.tsx        # Skill definition viewer
-    └── HookManager.tsx         # Hook definition editor
+    ├── HookManager.tsx         # Hook definition editor
+    └── PermissionManager.tsx   # Permission rules CRUD UI
 ```
 
 ## Privacy
